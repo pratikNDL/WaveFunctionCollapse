@@ -45,7 +45,7 @@ export default class Tile {
     }
 
     analyze(tiles) {
-
+        
     }
 }
 
