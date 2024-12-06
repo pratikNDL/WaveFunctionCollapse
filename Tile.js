@@ -2,10 +2,11 @@ import sharp from "sharp";
 import crypto from 'crypto';
 
 export default class Tile {
+
     constructor(imagePath) {
         this.imagePath = imagePath;
         this.sockets = [];
-        this.potentialNeighbors = [[], [], [], []] 
+        this.possibleNeighbor = [[], [], [], []] // all potential neighbors in all 4 direction
     }
 
     static async init(imagePath) {
@@ -45,7 +46,12 @@ export default class Tile {
     }
 
     analyze(tiles) {
-        
+        for(let i=0; i<tiles.length; i++) {
+            if(this.sockets[0] == tiles[i].sockets[2]) this.possibleNeighbor[0].push(i);
+            if(this.sockets[1] == tiles[i].sockets[3]) this.possibleNeighbor[1].push(i);
+            if(this.sockets[2] == tiles[i].sockets[0]) this.possibleNeighbor[2].push(i);
+            if(this.sockets[3] == tiles[i].sockets[1]) this.possibleNeighbor[3].push(i);
+        }
     }
 }
 
