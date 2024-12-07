@@ -1,8 +1,12 @@
 export default class MinHeap {
     constructor(grid) {
-      this.heap = [];
-      for(let cell of grid) {
-        this.insert(cell);
+      this.heap = [...grid];
+      this._buildHeap();
+    }
+  
+    _buildHeap() {
+      for (let i = Math.floor(this.heap.length / 2) - 1; i >= 0; i--) {
+        this._heapifyDown(i);
       }
     }
   
@@ -26,8 +30,7 @@ export default class MinHeap {
     }
   
     _compare(a, b) {
-      if (a.options.length !== b.options.length) return a.options.length - b.options.length;
-      return Math.random() - Math.random();
+      return(a.options.length) - (b.options.length);
     }
   
     _heapifyUp() {
@@ -41,8 +44,7 @@ export default class MinHeap {
       }
     }
   
-    _heapifyDown() {
-      let index = 0;
+    _heapifyDown(index = 0) {
       const length = this.heap.length;
   
       while (true) {
