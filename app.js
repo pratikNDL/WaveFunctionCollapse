@@ -4,6 +4,7 @@ import { createServer } from 'http';
 import { Server } from 'socket.io';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import WFC from './WFC.js'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const app = express();
@@ -13,17 +14,11 @@ const io = new Server(server);
 
 app.use(express.static(path.join(__dirname, 'public')));
 
-io.on('connection', (socket) => {
-    const interval = setInterval(() => {
-        const data = Array.from({ length: 25 }, () => Math.random() > 0.5 ? '🟩' : '⬛');
-        socket.emit('gridData', data);
-      }, 2000);
-    
-      socket.on('disconnect', () => {
-        clearInterval(interval);
-      });
-    });
+io.on('connection', async (socket) => {
+  const wfc = await WFC.init(socket, 25);
+  wfc.start();
+});
 
-server.listen(3000, () => {
-  console.log('Server running at 3000');
+server.listen(3300, () => {
+  console.log('Server running');
 });
