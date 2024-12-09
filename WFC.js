@@ -1,6 +1,8 @@
 import Tile from './Tile.js';
 import Cell from './Cell.js';
 import MinHeap from './MinHeap.js';
+import fs from 'fs/promises'
+import path from 'path'
 
 
 export default class WFC {
@@ -14,29 +16,35 @@ export default class WFC {
 
     static async init(socket, N) {
         const wfc = new WFC(socket, N);
-        await wfc.initTiles();
+        await wfc.initTiles('./images/pipes');
         return wfc;
     }
 
-    async initTiles() {
-        this.tiles.push(await Tile.init("./images/left.png"));
-        this.tiles.push(await Tile.init("./images/up.png"));
-        this.tiles.push(await Tile.init("./images/right.png"));
-        this.tiles.push(await Tile.init("./images/down.png"));
-        this.tiles.push(await Tile.init("./images/blank.png"));
-        for(const tile of this.tiles) {
-            tile.analyze(this.tiles)
-        }
+    async initTiles(folderPath) {
+        try {
+            const files = await fs.readdir(folderPath);
+            for (const file of files) {
+              const fullPath = path.join(folderPath, file);
+              this.tiles.push(await Tile.init(fullPath));
+            }
+            for(const tile of this.tiles) tile.analyze(this.tiles)
+          } 
+          catch (error) {
+            console.error('Error:', error);
+          }
+    
+        
     }
 
     start() {
         this.grid = Array.from({length: this.N*this.N}, () => new Cell(this.tiles.length))
         this.minHeap = new MinHeap(this.grid);
-        this.execute();
+        this.printSize();
+        this.tileSummary()
+        // this.execute();
     }
 
     async execute() {
-
         while(this.minHeap.heap.length) {
             const cell = this.minHeap.extract();
             if(cell.options.length==0) {
@@ -45,59 +53,59 @@ export default class WFC {
             }
             cell.collapsed = true;
             const tileIndex = Math.floor(Math.random()*cell.options.length);
-            cell.options = [tileIndex]
+            cell.options = [cell.options[tileIndex]]
+            this.printGrid();
             this.propagate();
             this.minHeap._buildHeap();
-            await sleep(200)
-            this.sendGrid()
+            // console.clear()
+            // this.printSize();
+            await sleep(500/this.N) 
+            this.sendGrid();           
         }
     }
 
     propagate() {
-        for(let i=0; i<this.N; i++) {
-            for(let j=0; j<this.N; j++) {
-                const cell = this.grid[i*this.N + j];
-                if(!cell.collapsed) {
-                    let options = new Set(Array.from({length: this.N}, (_, i) => i));
+        const updateOptionsFromNeighbor = (i, j, dir, neighborI, neighborJ, options) => {
+            if (neighborI < 0 || neighborJ < 0 || neighborI >= this.N || neighborJ >= this.N) return options;
     
-                    if(i>0) {
-                        let updatedOptions = new Set()
-                        for(const tile of this.grid[(i-1)*this.N + j].options) {
-                            for(let neighbor of this.tiles[tile].possibleNeighbor[2]) {
-                                if(options.has(neighbor)) updatedOptions.add(neighbor)
-                            }
-                        }
-                        options = updatedOptions;
+            const neighborCell = this.grid[neighborI * this.N + neighborJ];
+            let updatedOptions = new Set();
     
+            for (const tile of neighborCell.options) {
+                for (const neighbor of this.tiles[tile].possibleNeighbor[dir]) {
+                    if (options.has(neighbor)) {
+                        updatedOptions.add(neighbor);
                     }
-                    if(j>0) {
-                        let updatedOptions = new Set()
-                        for(const tile of this.grid[(i)*this.N + j-1].options)  {
-                            for(let neighbor of this.tiles[tile].possibleNeighbor[3]) {
-                                if(options.has(neighbor)) updatedOptions.add(neighbor)
-                            }
-                        }
-                        options = updatedOptions;
-                    }
-                    if(i<this.N-1) {
-                        let updatedOptions = new Set()
-                        for(const tile of this.grid[(i+1)*this.N + j].options)  {
-                            for(let neighbor of this.tiles[tile].possibleNeighbor[0]) {
-                                if(options.has(neighbor)) updatedOptions.add(neighbor)
-                            }
-                        }
-                        options = updatedOptions;
-                    }
-                    if(j<this.N-1) {
-                        let updatedOptions = new Set()
-                        for(const tile of this.grid[(i)*this.N + j+1].options)  {
-                            for(let neighbor of this.tiles[tile].possibleNeighbor[1]) {
-                                if(options.has(neighbor)) updatedOptions.add(neighbor)
-                            }
-                        }
-                        options = updatedOptions;
-                    }
+                }
+            }
+            return updatedOptions;
+        };
+    
+        for (let i = 0; i < this.N; i++) {
+            for (let j = 0; j < this.N; j++) {
+                const cell = this.grid[i * this.N + j];
+                if (!cell.collapsed) {
+                    console.log(i, j, "started");
+                    let options = new Set(Array.from({ length: this.tiles.length }, (_, i) => i));
+    
+                    // Top neighbor 
+                    options = updateOptionsFromNeighbor(i, j, 2, i - 1, j, options);
+                    // console.log(options);
+    
+                    // Right neighbor
+                    options = updateOptionsFromNeighbor(i, j, 3, i, j + 1, options);
+                    // console.log(options);
+    
+                    // Bottom neighbor 
+                    options = updateOptionsFromNeighbor(i, j, 0, i + 1, j, options);
+                    // console.log(options);
+    
+                    // Left neighbor 
+                    options = updateOptionsFromNeighbor(i, j, 1, i, j - 1, options);
+                    // console.log(options);
+    
                     cell.options = Array.from(options);
+                    console.log("finished");
                 }
             }
         }
@@ -108,41 +116,63 @@ export default class WFC {
         for(let i=0; i<this.grid.length; i++) {
             gridData[i] = this.grid[i].collapsed ? this.tiles[this.grid[i].options[0]].imagePath : ""; 
         }
+        console.log(gridData)
         this.socket.emit('gridData', gridData);
     }
-}
 
 
-
-
-
-
-function printGrid(grid) {
-    for(let i=0; i<N; i++) {
-        for(let j=0; j<N; j++) {
-            const cell = grid[i*N + j];
-            const text = cell.collapsed ? cell.options[0]: "."
-            process.stdout.write(text+" ")
+    printGrid() {
+        for(let i=0; i<this.N; i++) {
+            for(let j=0; j<this.N; j++) {
+                const cell = this.grid[i*this.N + j];
+                const text = cell.collapsed ? cell.options[0]: "."
+                process.stdout.write(text+" ")
+            }
+            console.log()
         }
         console.log()
+    
     }
-    console.log()
-
-}
-
-function printSize(grid) { 
-    for(let i=0; i<N; i++) {
-        for(let j=0; j<N; j++) {
-            const cell = grid[i*N + j];
-            if(cell.collapsed) process.stdout.write('X'+" ");
-            else process.stdout.write(cell.options.length+" ")
-
+    
+    printSize() { 
+        for(let i=0; i<this.N; i++) {
+            for(let j=0; j<this.N; j++) {
+                const cell = this.grid[i*this.N + j];
+                if(cell.collapsed) process.stdout.write('X'+" ");
+                else process.stdout.write(cell.options.length+" ")
+    
+            }
+            console.log()
         }
         console.log()
+    
     }
-    console.log()
 
+
+    tileSummary() {
+        for(const tile of this.tiles) {
+            console.log(tile.imagePath)
+            console.log(tile.sockets)
+            process.stdout.write('0-> ');
+            for(const neighbor of tile.possibleNeighbor[0]) process.stdout.write(neighbor+' ');
+            console.log()
+
+            process.stdout.write('1-> ');
+            for(const neighbor of tile.possibleNeighbor[1]) process.stdout.write(neighbor+' ');
+            console.log()
+
+            process.stdout.write('2-> ');
+            for(const neighbor of tile.possibleNeighbor[2]) process.stdout.write(neighbor+' ');
+            console.log()
+
+            process.stdout.write('3-> ');
+            for(const neighbor of tile.possibleNeighbor[3]) process.stdout.write(neighbor+' ');
+            console.log()
+        }
+    }
 }
+
+
 
 function sleep(ms) {
     return new Promise(resolve => setTimeout(resolve, ms));
@@ -151,3 +181,5 @@ function sleep(ms) {
 
 
 
+// const wfc = await WFC.init({}, 5);
+// wfc.start();

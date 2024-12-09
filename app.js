@@ -15,10 +15,10 @@ const io = new Server(server);
 app.use(express.static(path.join(__dirname, 'public')));
 
 io.on('connection', async (socket) => {
-  const wfc = await WFC.init(socket, 25);
+  const wfc = await WFC.init(socket, 7);
   wfc.start();
 });
 
-server.listen(3300, () => {
+server.listen(3000, () => {
   console.log('Server running');
 });
